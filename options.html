@@ -26,7 +26,10 @@
   </select>
 </label>
 
-<label><span>Your own cobalt instance (optional)</span>
+<label class="row"><input type="checkbox" id="useYtdlp"> Download YouTube with yt-dlp</label>
+<small id="ytdlpStatus">Checking the yt-dlp helper…</small>
+
+<label style="margin-top:12px"><span>Your own cobalt instance (optional)</span>
   <input type="text" id="customApi" placeholder="https://api.example.com">
   <small>When set, only this instance is used instead of the cobalt.directory list.</small>
 </label>

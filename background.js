@@ -102,14 +102,63 @@ const save = (url, filename) => chrome.downloads.download({ url, ...(filename &&
 const notify = (title, message) =>
   chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title, message });
 
-async function download(link, mode, kind) {
-  const { torboxKey } = await getSettings();
+const YTDLP_HOST = "com.cobalt_downloader.ytdlp";
+const isYouTube = (link) => /^((www|m|music)\.)?youtube\.com$|^youtu\.be$/.test(new URL(link).hostname);
+
+async function download(link, mode, kind, tabId) {
+  const { torboxKey, useYtdlp, quality } = await getSettings();
   if (kind === "torbox") return torboxDownload(torboxKey, link);
+  const errors = [];
+  // YouTube changes too often for public cobalt instances; the local yt-dlp helper is
+  // the most reliable route when it's installed (see native/).
+  if (useYtdlp && isYouTube(link)) {
+    const viaYtdlp = await ytdlpDownload(link, mode, quality, tabId);
+    if (viaYtdlp.ok) return viaYtdlp;
+    if (!viaYtdlp.missing) errors.push(`yt-dlp: ${viaYtdlp.error}`);
+  }
   const result = await cobaltDownload(link, mode);
+  result.errors = [...errors, ...(result.errors ?? [])];
   // TorBox has no audio-only mode, so it is only a fallback for full downloads.
   if (result.ok || !torboxKey || mode === "audio") return result;
   const viaTorbox = await torboxDownload(torboxKey, link);
   return viaTorbox.ok ? viaTorbox : { ...result, errors: [...result.errors, `TorBox: ${viaTorbox.error}`] };
+}
+
+// Runs the download through the native yt-dlp helper and resolves when it finishes.
+// Progress goes to the toast in the tab that asked for the download.
+function ytdlpDownload(link, mode, quality, tabId) {
+  return new Promise((resolve) => {
+    const port = chrome.runtime.connectNative(YTDLP_HOST);
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+      port.disconnect();
+    };
+    port.onMessage.addListener((msg) => {
+      if (msg.type === "progress" && tabId) {
+        chrome.tabs.sendMessage(tabId, { type: "progress", link, text: `yt-dlp ${msg.percent}` }).catch(() => {});
+      } else if (msg.type === "done") {
+        notify("Saved to Downloads", msg.file.split("/").pop());
+        finish({ ok: true, host: "yt-dlp", saved: true });
+      } else if (msg.type === "error") {
+        finish({ ok: false, error: msg.error });
+      }
+    });
+    port.onDisconnect.addListener(() => {
+      const error = chrome.runtime.lastError?.message ?? "the helper stopped";
+      finish({ ok: false, error, missing: /not found|forbidden/i.test(error) });
+    });
+    port.postMessage({ type: "download", url: link, mode, quality });
+  });
+}
+
+function ytdlpStatus() {
+  return chrome.runtime
+    .sendNativeMessage(YTDLP_HOST, { type: "ping" })
+    .then((res) => (res.ytdlp ? "ready" : "no-ytdlp"))
+    .catch(() => "no-helper");
 }
 
 async function torboxDownload(key, link) {
@@ -253,12 +302,15 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
       lastLink = found?.link ?? null;
     });
   } else if (msg.type === "download") {
-    download(msg.link, msg.mode, msg.kind).then(respond);
+    download(msg.link, msg.mode, msg.kind, sender.tab?.id).then(respond);
     return true;
   } else if (msg.type === "openFrontend") {
     openFrontend(msg.link, msg.frontend);
   } else if (msg.type === "instances") {
     getInstances(msg.force).then(respond);
+    return true;
+  } else if (msg.type === "ytdlpStatus") {
+    ytdlpStatus().then(respond);
     return true;
   }
 });

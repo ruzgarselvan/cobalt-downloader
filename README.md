@@ -17,6 +17,7 @@ Works in Chrome and every Chromium-based browser: [Helium](https://helium.comput
 - **Video or audio only:** Saves straight to your Downloads folder, in up to 4K quality or as audio only.
 - **Always a working server:** Finds a working cobalt instance automatically. The live list comes from [cobalt.directory](https://cobalt.directory), and if one instance fails the next one is tried.
 - **Works with Turnstile-protected instances:** When a link can only be downloaded on an instance that uses Cloudflare Turnstile, that instance's website opens with your link already filled in.
+- **Reliable YouTube with yt-dlp (optional):** With a small local helper, YouTube links are downloaded by [yt-dlp](https://github.com/yt-dlp/yt-dlp) as H.264 MP4 files that play everywhere, with live progress in the popup.
 - **Optional [TorBox](https://torbox.app) support:** Downloads magnet links (torrents) and links from file hosts like Mega, 1fichier, Google Drive, MediaFire and Pixeldrain, and acts as a fallback when cobalt can't handle a video.
 - **Private:** The clipboard is read locally and nothing leaves your browser until you click download. No analytics.
 
@@ -39,6 +40,23 @@ The extension isn't on the Chrome Web Store yet, so you install it from this rep
 4. Click **Load unpacked** and select the folder.
 
 To update, pull or download the latest code and press the reload button on the extension's card in `chrome://extensions`.
+
+## YouTube with yt-dlp (recommended, macOS)
+
+Public cobalt instances often fail on YouTube. The extension can hand YouTube links to [yt-dlp](https://github.com/yt-dlp/yt-dlp) on your Mac through a small helper script (`native/host.py`), using Chrome's native messaging.
+
+1. Install or update yt-dlp and its helpers:
+   ```sh
+   brew install yt-dlp ffmpeg deno   # or: brew upgrade yt-dlp
+   ```
+2. Copy the extension's ID from its card in `chrome://extensions`.
+3. Register the helper from the extension folder:
+   ```sh
+   ./native/install.sh <extension-id>
+   ```
+4. Reload the extension. The options page shows whether the helper is ready.
+
+YouTube links then go to yt-dlp first and fall back to cobalt if it fails. Files are saved to `~/Downloads`. Keep yt-dlp up to date (`brew upgrade yt-dlp`), since YouTube changes often. If you move the extension folder, run the install script again.
 
 ## How to use
 
@@ -78,13 +96,14 @@ Right-click the extension icon → **Options**:
 
 - **Local clipboard reading:** The extension reads the clipboard once a second inside the browser to spot links. What you copy is never stored or sent anywhere.
 - **What leaves your browser:** A link is sent to a cobalt instance, or to TorBox, only when you click a download button.
+- **yt-dlp helper:** When installed, YouTube links are passed to yt-dlp on your own computer, which downloads them directly from YouTube.
 - **Other network requests:** The only other requests are to cobalt.directory (the instance list) and to TorBox's public list of supported file hosts.
 - **No tracking:** No analytics and no accounts.
 
 ## FAQ
 
 **Why does a download sometimes fail?**
-Community instances are run by volunteers, and sites like YouTube change often. The extension tries every open instance and then offers the website fallback. Adding a TorBox key gives you a paid, more reliable fallback.
+Community instances are run by volunteers, and sites like YouTube change often. The extension tries every open instance and then offers the website fallback. For YouTube, the [yt-dlp helper](#youtube-with-yt-dlp-recommended-macos) is the most reliable option. A TorBox key adds another fallback.
 
 **Why only a few instances? cobalt.directory lists many more.**
 Most instances use Cloudflare Turnstile, which can only be solved on their own website. Those instances are used through the "Open on …" fallback instead.

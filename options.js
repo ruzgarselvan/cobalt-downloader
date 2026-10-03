@@ -25,5 +25,14 @@ async function render(force) {
   if (!instances.length) list.innerHTML = "<li>Couldn't load the list.</li>";
 }
 
+const YTDLP_STATUS = {
+  ready: "yt-dlp helper is installed. YouTube links download with yt-dlp first.",
+  "no-ytdlp": "The helper is installed but yt-dlp isn't. Run: brew install yt-dlp ffmpeg deno",
+  "no-helper": "The yt-dlp helper isn't installed, so YouTube uses cobalt. See the README to set it up.",
+};
+chrome.runtime
+  .sendMessage({ type: "ytdlpStatus" })
+  .then((status) => (document.getElementById("ytdlpStatus").textContent = YTDLP_STATUS[status]));
+
 document.getElementById("refresh").onclick = () => render(true);
 render(false);

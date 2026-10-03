@@ -4,6 +4,7 @@ export const DEFAULTS = {
   customApi: "",
   apiKey: "",
   torboxKey: "",
+  useYtdlp: true,
 };
 
 export const getSettings = () => chrome.storage.sync.get(DEFAULTS);

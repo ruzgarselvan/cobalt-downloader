@@ -78,6 +78,7 @@ if (!window.__cobaltIndir) {
   `;
 
   let current = null;
+  let onProgress = null;
 
   function show(link, kind) {
     const viaTorbox = kind === "torbox";
@@ -120,6 +121,7 @@ if (!window.__cobaltIndir) {
 
     function close() {
       clearInterval(timer);
+      onProgress = null;
       host.remove();
       if (current === host) current = null;
     }
@@ -133,14 +135,16 @@ if (!window.__cobaltIndir) {
         btn.innerHTML = '<div class="spinner"></div>';
         status.className = "status";
         status.textContent = viaTorbox ? "Sending to TorBox…" : "Finding a working instance…";
+        onProgress = (text) => (status.textContent = `Downloading · ${text}`);
         const result = await chrome.runtime.sendMessage({ type: "download", link, mode: btn.dataset.mode, kind });
         busy = false;
+        onProgress = null;
         btn.classList.remove("busy");
         if (result.ok) {
           btn.innerHTML = ICONS.done;
           status.textContent = result.queued
             ? "Added to TorBox. It will download automatically when ready."
-            : `Downloading via ${result.host}`;
+            : result.saved ? "Saved to Downloads" : `Downloading via ${result.host}`;
           deadline = Date.now() + (result.queued ? 5000 : 2000);
           return;
         }
@@ -174,5 +178,6 @@ if (!window.__cobaltIndir) {
 
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === "prompt" && window === window.top) show(msg.link, msg.kind);
+    if (msg.type === "progress") onProgress?.(msg.text);
   });
 }
