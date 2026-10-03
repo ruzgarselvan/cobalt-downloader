@@ -105,14 +105,14 @@ const notify = (title, message) =>
 const YTDLP_HOST = "com.cobalt_downloader.ytdlp";
 const isYouTube = (link) => /^((www|m|music)\.)?youtube\.com$|^youtu\.be$/.test(new URL(link).hostname);
 
-async function download(link, mode, kind, tabId) {
+async function download(link, mode, kind, onProgress) {
   const { torboxKey, useYtdlp, quality } = await getSettings();
   if (kind === "torbox") return torboxDownload(torboxKey, link);
   // Public cobalt instances fail on YouTube too often, so when the local yt-dlp helper is
   // installed (see native/) YouTube goes only there. The cobalt website stays on offer.
   const ytdlp = useYtdlp && isYouTube(link);
   if (ytdlp) {
-    const viaYtdlp = await ytdlpDownload(link, mode, quality, tabId);
+    const viaYtdlp = await ytdlpDownload(link, mode, quality, onProgress);
     if (viaYtdlp.ok) return viaYtdlp;
     if (!viaYtdlp.missing) {
       return {
@@ -135,9 +135,9 @@ async function download(link, mode, kind, tabId) {
   return viaTorbox.ok ? viaTorbox : { ...result, errors: [...result.errors, `TorBox: ${viaTorbox.error}`] };
 }
 
-// Runs the download through the native yt-dlp helper and resolves when it finishes.
-// Progress goes to the toast in the tab that asked for the download.
-function ytdlpDownload(link, mode, quality, tabId) {
+// Runs the download through the native yt-dlp helper and resolves when it finishes,
+// reporting progress (e.g. "42.0%") along the way.
+function ytdlpDownload(link, mode, quality, onProgress) {
   return new Promise((resolve) => {
     const port = chrome.runtime.connectNative(YTDLP_HOST);
     let settled = false;
@@ -148,8 +148,8 @@ function ytdlpDownload(link, mode, quality, tabId) {
       port.disconnect();
     };
     port.onMessage.addListener((msg) => {
-      if (msg.type === "progress" && tabId) {
-        chrome.tabs.sendMessage(tabId, { type: "progress", link, text: `yt-dlp ${msg.percent}` }).catch(() => {});
+      if (msg.type === "progress") {
+        onProgress?.(msg.percent);
       } else if (msg.type === "done") {
         notify("Saved to Downloads", msg.file.split("/").pop());
         finish({ ok: true, host: "yt-dlp", saved: true });
@@ -318,7 +318,10 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
       lastLink = found?.link ?? null;
     });
   } else if (msg.type === "download") {
-    download(msg.link, msg.mode, msg.kind, sender.tab?.id).then(respond);
+    const tabId = sender.tab?.id;
+    const onProgress = (percent) =>
+      chrome.tabs.sendMessage(tabId, { type: "progress", link: msg.link, text: `yt-dlp ${percent}` }).catch(() => {});
+    download(msg.link, msg.mode, msg.kind, tabId && onProgress).then(respond);
     return true;
   } else if (msg.type === "openFrontend") {
     openFrontend(msg.link, msg.frontend);
@@ -331,10 +334,41 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
   }
 });
 
+// The toolbar button downloads the current page right away; progress and the result
+// show on the button's badge, failures also as a notification.
 chrome.action.onClicked.addListener(async (tab) => {
-  if (!tab.url) return;
+  if (!/^https?:|^magnet:/.test(tab.url ?? "")) return;
+  const badge = (text, color) => {
+    chrome.action.setBadgeText({ tabId: tab.id, text });
+    if (color) chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color });
+  };
+  badge("…", "#636366");
   const found = await classify(tab.url);
-  prompt(tab.url, found?.kind ?? "video", tab);
+  const result = await download(tab.url, "auto", found?.kind ?? "video", (percent) =>
+    badge(String(Math.floor(parseFloat(percent)) || 0)),
+  );
+  if (result.ok) {
+    badge("✓", "#34c759");
+    if (result.queued) notify("Added to TorBox", "It will download automatically when ready.");
+    setTimeout(() => badge(""), 5000);
+    return;
+  }
+  badge("!", "#ff3b30");
+  const message = result.message ?? result.error ?? "No working instance could download this link.";
+  if (!result.frontend) return notify("Couldn't download this", message);
+  chrome.notifications.create(`open|${result.frontend}|${tab.url}`, {
+    type: "basic",
+    iconUrl: "icons/128.png",
+    title: "Couldn't download this",
+    message: `${message} Click to open it on ${new URL(result.frontend).host}.`,
+  });
+});
+
+chrome.notifications.onClicked.addListener((id) => {
+  if (!id.startsWith("open|")) return;
+  chrome.notifications.clear(id);
+  const [, frontend, link] = id.match(/^open\|([^|]+)\|(.*)$/s);
+  openFrontend(link, frontend);
 });
 
 // The offscreen document polls the clipboard; it only exists while watching is on.
