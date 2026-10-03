@@ -76,7 +76,7 @@ If you have a [TorBox](https://torbox.app) subscription, paste your API key from
 
 - **Magnet links and file-host links** go straight to TorBox. Torrents with several files are saved into their own folder.
 - **Content TorBox hasn't cached yet** is fetched by TorBox first. The extension checks every 30 seconds and downloads it automatically when it's ready, then shows a notification.
-- **Video links** still go to cobalt first. TorBox is only used when cobalt fails.
+- **Video links** still go to cobalt first. TorBox is only used when cobalt fails, except on YouTube, where TorBox returns low-resolution WebM files and the cobalt website is used instead.
 
 Your key is stored only in your browser's extension storage and is sent only to TorBox.
 

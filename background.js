@@ -118,8 +118,10 @@ async function download(link, mode, kind, tabId) {
   }
   const result = await cobaltDownload(link, mode);
   result.errors = [...errors, ...(result.errors ?? [])];
-  // TorBox has no audio-only mode, so it is only a fallback for full downloads.
-  if (result.ok || !torboxKey || mode === "audio") return result;
+  // TorBox has no audio-only mode, so it is only a fallback for full downloads. For
+  // YouTube it returns low-resolution AV1 WebM files, so the cobalt website (H.264 MP4)
+  // is the better fallback there.
+  if (result.ok || !torboxKey || mode === "audio" || isYouTube(link)) return result;
   const viaTorbox = await torboxDownload(torboxKey, link);
   return viaTorbox.ok ? viaTorbox : { ...result, errors: [...result.errors, `TorBox: ${viaTorbox.error}`] };
 }
