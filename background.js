@@ -159,6 +159,22 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (!pending.length && !added.length) chrome.alarms.clear("torbox");
 });
 
+// When an instance can't fetch a video it may still answer with a tunnel that streams
+// 0 bytes. The headers already say so (Content-Length 0, Estimated-Content-Length -1),
+// so peek at them and abort before downloading. Tunnels can be requested again.
+async function tunnelHasData(url) {
+  const ctrl = new AbortController();
+  try {
+    const res = await fetch(url, { signal: AbortSignal.any([ctrl.signal, AbortSignal.timeout(20000)]) });
+    const estimate = res.headers.get("estimated-content-length");
+    return res.ok && res.headers.get("content-length") !== "0" && !(estimate && Number(estimate) <= 0);
+  } catch {
+    return false;
+  } finally {
+    ctrl.abort();
+  }
+}
+
 async function cobaltDownload(link, mode) {
   const settings = await getSettings();
   const list = await getInstances();
@@ -181,6 +197,10 @@ async function cobaltDownload(link, mode) {
       });
       const data = await res.json();
       if (data.status === "tunnel" || data.status === "redirect") {
+        if (data.status === "tunnel" && !(await tunnelHasData(data.url))) {
+          errors.push(`${host}: empty file`);
+          continue;
+        }
         await save(data.url, data.filename);
         return { ok: true, host };
       }
