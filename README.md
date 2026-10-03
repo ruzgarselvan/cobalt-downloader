@@ -1,5 +1,7 @@
 # Cobalt Downloader
 
+> All available cobalt instances in your browser.
+
 **Copy a video link, click download, done.** A free, open-source browser extension that notices when you copy a YouTube, TikTok, Instagram, X (Twitter), Reddit or other video link and downloads the video or just the audio in one click, through [cobalt](https://github.com/imputnet/cobalt). No ads, no sketchy downloader websites and no account needed.
 
 Works in Chrome and every Chromium-based browser: [Helium](https://helium.computer), Brave, Edge, Arc, Vivaldi, Opera and others.
