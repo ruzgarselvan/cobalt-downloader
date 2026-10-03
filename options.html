@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 16px; min-width: 380px; }
+  label { display: block; margin-bottom: 12px; }
+  label > span { display: block; font-weight: 600; margin-bottom: 4px; }
+  label.row { display: flex; gap: 8px; align-items: center; }
+  input[type=text], input[type=password], select { width: 100%; box-sizing: border-box; padding: 5px 6px; }
+  small { display: block; opacity: .65; margin-top: 3px; }
+  h3 { margin: 20px 0 6px; font-size: 13px; }
+  ul { margin: 0; padding-left: 18px; }
+  .muted { opacity: .55; }
+</style>
+
+<label class="row"><input type="checkbox" id="watchClipboard"> Kopyalanan video linklerini algıla</label>
+<small>Pano yalnızca bu tarayıcıda okunur. Bir link ancak sen "İndir"e bastığında bir cobalt instance'ına gönderilir.</small>
+
+<label style="margin-top:12px"><span>Video kalitesi</span>
+  <select id="quality">
+    <option value="max">En yüksek</option>
+    <option>2160</option><option>1440</option><option>1080</option>
+    <option>720</option><option>480</option><option>360</option>
+  </select>
+</label>
+
+<label><span>Kendi instance'ın (isteğe bağlı)</span>
+  <input type="text" id="customApi" placeholder="https://api.ornek.com">
+  <small>Doluysa cobalt.directory listesi yerine yalnızca bu kullanılır.</small>
+</label>
+
+<label><span>API anahtarı (isteğe bağlı)</span>
+  <input type="password" id="apiKey">
+</label>
+
+<label><span>TorBox API anahtarı (isteğe bağlı)</span>
+  <input type="password" id="torboxKey">
+  <small>Girilirse magnet linkleri ve Mega, 1fichier, Google Drive gibi dosya linkleri TorBox ile indirilir. Video linkleri yine önce cobalt'a gider, cobalt indiremezse TorBox denenir. Anahtarı torbox.app → Settings'ten alabilirsin.</small>
+</label>
+
+<h3>cobalt.directory'den gelen instance'lar <button id="refresh">Yenile</button></h3>
+<ul id="list"><li class="muted">Yükleniyor…</li></ul>
+
+<script type="module" src="options.js"></script>

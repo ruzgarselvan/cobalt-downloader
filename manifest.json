@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Cobalt İndirici",
+  "version": "0.1.0",
+  "description": "Kopyaladığın video linkini algılar ve cobalt.directory'deki çalışan bir cobalt instance'ı üzerinden indirir.",
+  "permissions": ["storage", "downloads", "offscreen", "clipboardRead", "scripting", "notifications", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "content_scripts": [{ "matches": ["<all_urls>"], "js": ["content.js"] }],
+  "action": { "default_title": "Bu sayfadaki videoyu indir" },
+  "options_ui": { "page": "options.html" },
+  "icons": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" }
+}
