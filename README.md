@@ -56,7 +56,7 @@ Public cobalt instances often fail on YouTube. The extension can hand YouTube li
    ```
 4. Reload the extension. The options page shows whether the helper is ready.
 
-YouTube links then go to yt-dlp first and fall back to cobalt if it fails. Files are saved to `~/Downloads`. Keep yt-dlp up to date (`brew upgrade yt-dlp`), since YouTube changes often. If you move the extension folder, run the install script again.
+YouTube links then go straight to yt-dlp, skipping cobalt. Without the helper, YouTube falls back to cobalt instances. Files are saved to `~/Downloads`. Keep yt-dlp up to date (`brew upgrade yt-dlp`), since YouTube changes often. If you move the extension folder, run the install script again.
 
 ## How to use
 

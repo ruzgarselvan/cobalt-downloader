@@ -108,16 +108,25 @@ const isYouTube = (link) => /^((www|m|music)\.)?youtube\.com$|^youtu\.be$/.test(
 async function download(link, mode, kind, tabId) {
   const { torboxKey, useYtdlp, quality } = await getSettings();
   if (kind === "torbox") return torboxDownload(torboxKey, link);
-  const errors = [];
-  // YouTube changes too often for public cobalt instances; the local yt-dlp helper is
-  // the most reliable route when it's installed (see native/).
-  if (useYtdlp && isYouTube(link)) {
+  // Public cobalt instances fail on YouTube too often, so when the local yt-dlp helper is
+  // installed (see native/) YouTube goes only there. The cobalt website stays on offer.
+  const ytdlp = useYtdlp && isYouTube(link);
+  if (ytdlp) {
     const viaYtdlp = await ytdlpDownload(link, mode, quality, tabId);
     if (viaYtdlp.ok) return viaYtdlp;
-    if (!viaYtdlp.missing) errors.push(`yt-dlp: ${viaYtdlp.error}`);
+    if (!viaYtdlp.missing) {
+      return {
+        ok: false,
+        errors: [`yt-dlp: ${viaYtdlp.error}`],
+        frontend: await websiteFallback(),
+        message: `yt-dlp couldn't download this: ${viaYtdlp.error}`,
+      };
+    }
   }
   const result = await cobaltDownload(link, mode);
-  result.errors = [...errors, ...(result.errors ?? [])];
+  if (!result.ok && ytdlp) {
+    result.message = "cobalt couldn't download this. Set up the yt-dlp helper for reliable YouTube downloads.";
+  }
   // TorBox has no audio-only mode, so it is only a fallback for full downloads. For
   // YouTube it returns low-resolution AV1 WebM files, so the cobalt website (H.264 MP4)
   // is the better fallback there.
@@ -265,8 +274,13 @@ async function cobaltDownload(link, mode) {
       errors.push(`${host}: ${e.message}`);
     }
   }
-  const frontend = list.find((i) => i.turnstile && i.frontend)?.frontend ?? FALLBACK_FRONTEND;
-  return { ok: false, errors, frontend };
+  return { ok: false, errors, frontend: await websiteFallback() };
+}
+
+// The best-scoring Turnstile instance's website, which can download in the browser.
+async function websiteFallback() {
+  const list = await getInstances();
+  return list.find((i) => i.turnstile && i.frontend)?.frontend ?? FALLBACK_FRONTEND;
 }
 
 function openFrontend(link, frontend) {

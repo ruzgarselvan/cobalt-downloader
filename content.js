@@ -151,14 +151,16 @@ if (!window.__cobaltIndir) {
         btn.innerHTML = btn.dataset.mode === "audio" ? ICONS.audio : ICONS.download;
         status.className = "status error";
         if (!result.frontend) {
-          status.textContent = `TorBox couldn't download this: ${result.error}`;
+          status.textContent = result.message ?? `TorBox couldn't download this: ${result.error}`;
           deadline = Date.now() + 6000;
           return;
         }
         const triedTorbox = result.errors.some((e) => e.startsWith("TorBox:"));
-        status.textContent = triedTorbox
-          ? "Neither the cobalt instances nor TorBox could download this link."
-          : "No Turnstile-free instance could download this link.";
+        status.textContent =
+          result.message ??
+          (triedTorbox
+            ? "Neither the cobalt instances nor TorBox could download this link."
+            : "No Turnstile-free instance could download this link.");
         status.title = result.errors.join("\n") || "No usable instance";
         const open = document.createElement("button");
         open.className = "primary fallback";

@@ -26,9 +26,9 @@ async function render(force) {
 }
 
 const YTDLP_STATUS = {
-  ready: "yt-dlp helper is installed. YouTube links download with yt-dlp first.",
+  ready: "yt-dlp helper is installed. YouTube links download with yt-dlp.",
   "no-ytdlp": "The helper is installed but yt-dlp isn't. Run: brew install yt-dlp ffmpeg deno",
-  "no-helper": "The yt-dlp helper isn't installed, so YouTube uses cobalt. See the README to set it up.",
+  "no-helper": "The yt-dlp helper isn't installed, so YouTube falls back to cobalt, which often fails. Run native/install.sh (see the README).",
 };
 chrome.runtime
   .sendMessage({ type: "ytdlpStatus" })
