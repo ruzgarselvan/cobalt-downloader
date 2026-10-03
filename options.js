@@ -14,15 +14,15 @@ async function render(force) {
   list.replaceChildren(
     ...instances.map((i) => {
       const li = document.createElement("li");
-      li.textContent = `${new URL(i.api).host} · %${i.score}`;
+      li.textContent = `${new URL(i.api).host} · ${i.score}%`;
       if (i.turnstile) {
         li.className = "muted";
-        li.textContent += " · Turnstile (yalnızca sitede açılır)";
+        li.textContent += " · Turnstile (opened on its website only)";
       }
       return li;
     }),
   );
-  if (!instances.length) list.innerHTML = "<li>Liste alınamadı.</li>";
+  if (!instances.length) list.innerHTML = "<li>Couldn't load the list.</li>";
 }
 
 document.getElementById("refresh").onclick = () => render(true);

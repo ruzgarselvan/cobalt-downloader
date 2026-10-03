@@ -141,16 +141,16 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       const ready = await torbox.check(torboxKey, job);
       if (ready) {
         for (const file of ready.files) await save(file.url, file.filename);
-        notify("TorBox indirmesi hazır", ready.name);
+        notify("TorBox download ready", ready.name);
       } else if (Date.now() - job.addedAt < TORBOX_JOB_TIMEOUT) {
         pending.push(job);
       } else {
-        notify("TorBox indirmesi zaman aşımına uğradı", job.link);
+        notify("TorBox download timed out", job.link);
       }
     } catch (e) {
       // Network hiccups are retried on the next tick; API errors end the job.
       if (["TypeError", "TimeoutError", "AbortError"].includes(e.name)) pending.push(job);
-      else notify("TorBox indiremedi", `${e.message}\n${job.link}`);
+      else notify("TorBox couldn't download this", `${e.message}\n${job.link}`);
     }
   }
   const { torboxJobs: now = [] } = await chrome.storage.local.get("torboxJobs");
@@ -258,7 +258,7 @@ async function syncOffscreen() {
       await chrome.offscreen.createDocument({
         url: "offscreen.html",
         reasons: ["CLIPBOARD"],
-        justification: "Kopyalanan video linklerini algılamak",
+        justification: "Detect copied video links",
       });
     } else if (!watchClipboard && open) {
       await chrome.offscreen.closeDocument();

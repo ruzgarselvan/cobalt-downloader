@@ -1,43 +1,113 @@
-# Cobalt İndirici
+# Cobalt Downloader
 
-Chromium tabanlı tarayıcılar (Helium, Chrome, Brave, Arc, Edge…) için küçük bir eklenti. Bir video linki kopyaladığında sağ altta bir pencere açılır. **İndir** ya da **Sadece ses** dersen dosya, [cobalt.directory](https://cobalt.directory)'de çalışan bir [cobalt](https://github.com/imputnet/cobalt) instance'ı üzerinden İndirilenler klasörüne iner.
+**Copy a video link, click download, done.** A free, open-source browser extension that notices when you copy a YouTube, TikTok, Instagram, X (Twitter), Reddit or other video link and downloads the video or just the audio in one click, through [cobalt](https://github.com/imputnet/cobalt). No ads, no sketchy downloader websites and no account needed.
 
-## Kurulum
+Works in Chrome and every Chromium-based browser: [Helium](https://helium.computer), Brave, Edge, Arc, Vivaldi, Opera and others.
 
-1. Bu klasörü indir (ya da `git clone`).
-2. Tarayıcıda `chrome://extensions` adresini aç ve sağ üstten **Geliştirici modu**nu aç.
-3. **Paketlenmemiş öğe yükle** düğmesine bas ve bu klasörü seç.
+<p>
+  <img src="docs/toast-video.png" width="380" alt="Cobalt Downloader popup for a copied YouTube link, with download and audio-only buttons">
+  <img src="docs/toast-torbox.png" width="380" alt="Cobalt Downloader popup for a copied magnet link, downloaded through TorBox">
+</p>
 
-## Nasıl çalışır
+## Features
 
-- **Algılama:** Eklenti panoyu saniyede bir yerel olarak okur. Adres çubuğundan ya da sayfadan kopyalanan linkleri algılar. YouTube, TikTok, Instagram, X, Reddit, Vimeo, SoundCloud, Twitch klipleri, Bluesky ve cobalt'ın desteklediği diğer servisler tanınır.
-- **İndirme:** İndir'e bastığında link, cobalt.directory'deki Turnstile'sız instance'lara puan sırasıyla gönderilir ve ilk başarılı yanıt indirilir. Liste 6 saatte bir yenilenir.
-- **Pencere:** Sadece kopyalamayı yaptığın, o an önde olan sekmede çıkar. Başka bir uygulamada kopyaladığında çıkmaz. Hiçbir düğmeye basmazsan 3 saniye sonra kaybolur.
-- **TorBox (isteğe bağlı):** Seçenekler'e TorBox API anahtarını girersen:
-  - Magnet linkleri ve Mega, 1fichier, Google Drive gibi dosya linkleri de algılanır ve TorBox ile indirilir. Birden çok dosyalı torrentler kendi klasörüne iner.
-  - TorBox'ın önbelleğinde olmayan içerikler önce TorBox tarafından indirilir. Eklenti 30 saniyede bir kontrol eder, hazır olunca dosyaları indirip bildirim gösterir.
-  - Video linkleri yine önce cobalt'a gider, cobalt indiremezse TorBox denenir.
-- **Yedek:** Turnstile'sız instance'lar linki indiremezse, en yüksek puanlı Turnstile'lı instance'ın sitesi link dolu halde açılır. Doğrulama orada senin tarayıcında normal şekilde yapılır.
-- **Araç çubuğu simgesi:** Simgeye tıklarsan açık sekmedeki video için aynı pencere açılır.
-- **Yeni sekme gibi sayfalar:** Tarayıcı bu sayfalarda eklentiye izin vermediği için pencere çıkmaz.
+- **Copy to download:** Copy a video link from the address bar or a page and a small popup appears in that tab. If you don't use it, it disappears after 3 seconds.
+- **Video or audio only:** Saves straight to your Downloads folder, in up to 4K quality or as audio only.
+- **Always a working server:** Finds a working cobalt instance automatically. The live list comes from [cobalt.directory](https://cobalt.directory), and if one instance fails the next one is tried.
+- **Works with Turnstile-protected instances:** When a link can only be downloaded on an instance that uses Cloudflare Turnstile, that instance's website opens with your link already filled in.
+- **Optional [TorBox](https://torbox.app) support:** Downloads magnet links (torrents) and links from file hosts like Mega, 1fichier, Google Drive, MediaFire and Pixeldrain, and acts as a fallback when cobalt can't handle a video.
+- **Private:** The clipboard is read locally and nothing leaves your browser until you click download. No analytics.
 
-## Ayarlar
+## Supported sites
 
-Eklentinin **Seçenekler** sayfasında şunlar var:
-- Pano izlemeyi açma/kapama
-- Video kalitesi
-- Kendi cobalt instance'ın ve API anahtarın
-- Güncel instance listesi
+YouTube (videos, Shorts, live), TikTok, Instagram (posts, reels, stories), X / Twitter, Reddit, Vimeo, SoundCloud, Twitch clips, Bilibili, Pinterest, Tumblr, Facebook, Dailymotion, Streamable, Bluesky, Loom, OK.ru, VK, Rutube, Snapchat, Xiaohongshu and Newgrounds. In short, everything [cobalt supports](https://github.com/imputnet/cobalt#supported-services).
 
-## Gizlilik
+With a TorBox key you also get magnet links and around 80 file hosts.
 
-Pano yalnızca tarayıcının içinde okunur. Kopyaladığın hiçbir şey dışarı gönderilmez. Bir link, sadece sen İndir'e bastığında seçilen cobalt instance'ına gider. Eklentinin bunun dışında tek yaptığı ağ isteği, instance listesi için cobalt.directory'ye yaptığı istektir.
+## Install
 
-## Bilinen sınırlar
+The extension isn't on the Chrome Web Store yet, so you install it from this repository:
 
-- Turnstile'sız instance sayısı az. Şu an 2 tane var, bazı servislerde ikisi de başarısız olabilir. O durumda yedek yol devreye girer.
-- cobalt.directory'nin açık bir API'si yok, liste sayfanın HTML'inden okunuyor. Site tasarımı değişirse ayrıştırma bozulabilir. Bu durumda Seçenekler'den kendi instance'ını girebilirsin.
+1. Download the code with **Code → Download ZIP** and unzip it, or run:
+   ```sh
+   git clone https://github.com/ruzgarselvan/cobalt-downloader.git
+   ```
+2. Open `chrome://extensions` in your browser.
+3. Turn on **Developer mode** in the top-right corner.
+4. Click **Load unpacked** and select the folder.
 
-## Lisans
+To update, pull or download the latest code and press the reload button on the extension's card in `chrome://extensions`.
 
-MIT. cobalt.directory, cobalt ve TorBox ile resmi bir bağlantısı yoktur.
+## How to use
+
+- **Copy a link:** Copy a video link, then click the download button (or the music note for audio only) in the popup.
+- **Toolbar icon:** Click the extension icon to download the video on the page you are looking at.
+- **Turnstile fallback:** If no open instance can download the link, the popup offers **Open on …**. This opens a cobalt website with your link filled in, where the download works normally.
+
+## How it works
+
+cobalt is a media downloader with a public API, and people run their own copies of it called *instances*. [cobalt.directory](https://cobalt.directory) tracks which instances are online and which sites work on each.
+
+The extension reads that list (refreshed every 6 hours) and sends your link to the best-scoring instances that don't require Cloudflare Turnstile. Turnstile is a bot check that can only be completed on an instance's own website, so a browser extension can't call those instances directly. Instead, it opens their website with the link already filled in.
+
+## TorBox (optional)
+
+If you have a [TorBox](https://torbox.app) subscription, paste your API key from torbox.app → Settings into the extension's options.
+
+- **Magnet links and file-host links** go straight to TorBox. Torrents with several files are saved into their own folder.
+- **Content TorBox hasn't cached yet** is fetched by TorBox first. The extension checks every 30 seconds and downloads it automatically when it's ready, then shows a notification.
+- **Video links** still go to cobalt first. TorBox is only used when cobalt fails.
+
+Your key is stored only in your browser's extension storage and is sent only to TorBox.
+
+## Options
+
+Right-click the extension icon → **Options**:
+
+| Option | What it does |
+| --- | --- |
+| Detect copied video links | Turn clipboard detection on or off. The toolbar icon still works when it's off. |
+| Video quality | Best available, or 2160p down to 360p (default 1080p). |
+| Your own cobalt instance | Use only your self-hosted instance and skip cobalt.directory. |
+| Instance API key | For instances that require an `Api-Key`. |
+| TorBox API key | Turns on TorBox support. |
+
+## Privacy
+
+- **Local clipboard reading:** The extension reads the clipboard once a second inside the browser to spot links. What you copy is never stored or sent anywhere.
+- **What leaves your browser:** A link is sent to a cobalt instance, or to TorBox, only when you click a download button.
+- **Other network requests:** The only other requests are to cobalt.directory (the instance list) and to TorBox's public list of supported file hosts.
+- **No tracking:** No analytics and no accounts.
+
+## FAQ
+
+**Why does a download sometimes fail?**
+Community instances are run by volunteers, and sites like YouTube change often. The extension tries every open instance and then offers the website fallback. Adding a TorBox key gives you a paid, more reliable fallback.
+
+**Why only a few instances? cobalt.directory lists many more.**
+Most instances use Cloudflare Turnstile, which can only be solved on their own website. Those instances are used through the "Open on …" fallback instead.
+
+**Does it work in Firefox or Safari?**
+Not yet. It relies on Chromium's offscreen documents to read the clipboard.
+
+**Is it safe?**
+The whole extension is a few hundred lines of plain JavaScript in this repository, with no build step and no dependencies, so you can read exactly what it does.
+
+**Can I use my own cobalt instance?**
+Yes. Enter its URL (and API key, if any) in the options.
+
+## Contributing
+
+Issues and pull requests are welcome. If you spot an outdated site pattern or a broken instance parser, please open an issue.
+
+## Credits and disclaimer
+
+- **cobalt** is made by [imput](https://github.com/imputnet/cobalt).
+- **cobalt.directory** is an unofficial instance tracker.
+- **TorBox** is a separate paid service.
+
+This project is not affiliated with any of them. Only download content you have the right to download, and respect each site's terms.
+
+## License
+
+[MIT](LICENSE)

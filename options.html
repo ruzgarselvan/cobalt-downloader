@@ -1,5 +1,7 @@
 <!doctype html>
+<html lang="en">
 <meta charset="utf-8">
+<title>Cobalt Downloader options</title>
 <style>
   :root { color-scheme: light dark; }
   body { font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 16px; min-width: 380px; }
@@ -13,32 +15,32 @@
   .muted { opacity: .55; }
 </style>
 
-<label class="row"><input type="checkbox" id="watchClipboard"> Kopyalanan video linklerini algıla</label>
-<small>Pano yalnızca bu tarayıcıda okunur. Bir link ancak sen "İndir"e bastığında bir cobalt instance'ına gönderilir.</small>
+<label class="row"><input type="checkbox" id="watchClipboard"> Detect copied video links</label>
+<small>The clipboard is only read inside this browser. A link is sent to a cobalt instance only when you press "Download".</small>
 
-<label style="margin-top:12px"><span>Video kalitesi</span>
+<label style="margin-top:12px"><span>Video quality</span>
   <select id="quality">
-    <option value="max">En yüksek</option>
+    <option value="max">Best available</option>
     <option>2160</option><option>1440</option><option>1080</option>
     <option>720</option><option>480</option><option>360</option>
   </select>
 </label>
 
-<label><span>Kendi instance'ın (isteğe bağlı)</span>
-  <input type="text" id="customApi" placeholder="https://api.ornek.com">
-  <small>Doluysa cobalt.directory listesi yerine yalnızca bu kullanılır.</small>
+<label><span>Your own cobalt instance (optional)</span>
+  <input type="text" id="customApi" placeholder="https://api.example.com">
+  <small>When set, only this instance is used instead of the cobalt.directory list.</small>
 </label>
 
-<label><span>API anahtarı (isteğe bağlı)</span>
+<label><span>Instance API key (optional)</span>
   <input type="password" id="apiKey">
 </label>
 
-<label><span>TorBox API anahtarı (isteğe bağlı)</span>
+<label><span>TorBox API key (optional)</span>
   <input type="password" id="torboxKey">
-  <small>Girilirse magnet linkleri ve Mega, 1fichier, Google Drive gibi dosya linkleri TorBox ile indirilir. Video linkleri yine önce cobalt'a gider, cobalt indiremezse TorBox denenir. Anahtarı torbox.app → Settings'ten alabilirsin.</small>
+  <small>When set, magnet links and file-host links (Mega, 1fichier, Google Drive…) are downloaded through TorBox. Video links still go to cobalt first; TorBox is tried if cobalt fails. Get your key at torbox.app → Settings.</small>
 </label>
 
-<h3>cobalt.directory'den gelen instance'lar <button id="refresh">Yenile</button></h3>
-<ul id="list"><li class="muted">Yükleniyor…</li></ul>
+<h3>Instances from cobalt.directory <button id="refresh">Refresh</button></h3>
+<ul id="list"><li class="muted">Loading…</li></ul>
 
 <script type="module" src="options.js"></script>
