@@ -61,7 +61,7 @@ YouTube links then go straight to yt-dlp, skipping cobalt. Without the helper, Y
 ## How to use
 
 - **Copy a link:** Copy a video link, then click the download button (or the music note for audio only) in the popup.
-- **Toolbar button:** Pin the extension and click its icon to download the video on the current page right away, with no popup. Progress and the result show on the icon's badge; if it fails, a notification lets you open the link on a cobalt website.
+- **Toolbar button:** Pin the extension and click its icon to download the video on the current page right away. A compact status popup shows the progress ("Downloading video · 42%") and the result. Click the icon again, or the popup's ×, to cancel; partial files are deleted.
 - **Turnstile fallback:** If no open instance can download the link, the popup offers **Open on …**. This opens a cobalt website with your link filled in, where the download works normally.
 
 ## How it works

@@ -12,6 +12,7 @@ if (!window.__cobaltIndir) {
     audio: icon('<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>'),
     close: icon('<path d="M17 7 7 17M7 7l10 10"/>'),
     done: icon('<path d="m5 12.5 4.5 4.5L19 7.5"/>'),
+    alert: icon('<path d="M12 7v6"/><path d="M12 17h.01"/>'),
   };
 
   const STYLE = `
@@ -68,6 +69,20 @@ if (!window.__cobaltIndir) {
       animation: shrink ${DISMISS_MS}ms linear forwards;
     }
     @keyframes shrink { to { transform: scaleX(0); } }
+    .job { width: 300px; padding: 10px 8px 10px 10px; }
+    .job .text { margin-left: 4px; }
+    .state {
+      flex: none; display: grid; place-items: center; width: 30px; height: 30px;
+      border-radius: 50%; background: var(--soft);
+    }
+    .state .spinner { width: 13px; height: 13px; }
+    .state svg { width: 16px; height: 16px; }
+    .state.done { color: #34c759; background: #34c75922; }
+    .state.error { color: var(--error); background: #ff3b3022; }
+    .bar { height: 3px; margin-top: 9px; border-radius: 2px; background: var(--soft); overflow: hidden; }
+    .fill { height: 100%; width: 0; border-radius: 2px; background: var(--fg); transition: width .3s; }
+    .fill.indeterminate { width: 30%; animation: slide 1.2s ease-in-out infinite; }
+    @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
     @media (prefers-color-scheme: dark) {
       .toast {
         --fg: #f5f5f7; --muted: #a1a1a6; --bg: #1c1c1eeb; --line: #ffffff1a;
@@ -79,6 +94,9 @@ if (!window.__cobaltIndir) {
 
   let current = null;
   let onProgress = null;
+
+  const hostLabel = (link) =>
+    link.startsWith("magnet:") ? "Magnet link" : new URL(link).hostname.replace(/^www\./, "");
 
   function show(link, kind) {
     const viaTorbox = kind === "torbox";
@@ -104,9 +122,7 @@ if (!window.__cobaltIndir) {
     primary.title = label;
     primary.setAttribute("aria-label", label);
     if (viaTorbox) $("[data-mode=audio]").remove();
-    $(".host").textContent = link.startsWith("magnet:")
-      ? "Magnet link"
-      : new URL(link).hostname.replace(/^www\./, "") + (viaTorbox ? " · TorBox" : "");
+    $(".host").textContent = hostLabel(link) + (viaTorbox && !link.startsWith("magnet:") ? " · TorBox" : "");
     $(".link").textContent = link;
     $(".link").title = link;
     $(".close").onclick = close;
@@ -135,7 +151,7 @@ if (!window.__cobaltIndir) {
         btn.innerHTML = '<div class="spinner"></div>';
         status.className = "status";
         status.textContent = viaTorbox ? "Sending to TorBox…" : "Finding a working instance…";
-        onProgress = (text) => (status.textContent = `Downloading · ${text}`);
+        onProgress = (text) => (status.textContent = text);
         const result = await chrome.runtime.sendMessage({ type: "download", link, mode: btn.dataset.mode, kind });
         busy = false;
         onProgress = null;
@@ -178,7 +194,72 @@ if (!window.__cobaltIndir) {
     current = host;
   }
 
+  // Status toast for downloads started from the toolbar button, updated as they run.
+  let job = null;
+
+  function showJob(msg) {
+    if (job?.link !== msg.link || !job.host.isConnected) job = createJobToast(msg.link);
+    job.update(msg);
+  }
+
+  function createJobToast(link) {
+    current?.remove();
+    const host = document.createElement("div");
+    const root = host.attachShadow({ mode: "closed" });
+    root.innerHTML = `
+      <style>${STYLE}</style>
+      <div class="toast job" role="status">
+        <div class="row">
+          <div class="state"></div>
+          <div class="text"><div class="host"></div><div class="link"></div></div>
+          <button class="ghost cancel" title="Cancel download" aria-label="Cancel download">${ICONS.close}</button>
+        </div>
+        <div class="bar"><div class="fill"></div></div>
+      </div>`;
+    const $ = (s) => root.querySelector(s);
+    $(".host").textContent = hostLabel(link);
+    $(".cancel").onclick = () => chrome.runtime.sendMessage({ type: "cancelJob" });
+    let hideTimer;
+    const close = () => {
+      host.remove();
+      if (current === host) current = null;
+    };
+    document.documentElement.append(host);
+    current = host;
+
+    return {
+      link,
+      host,
+      update({ state, text, percent, frontend }) {
+        clearTimeout(hideTimer);
+        const working = state === "working";
+        $(".link").textContent = text;
+        $(".state").className = `state ${state}`;
+        $(".state").innerHTML = working
+          ? '<div class="spinner"></div>'
+          : { done: ICONS.done, error: ICONS.alert, cancelled: ICONS.close }[state];
+        $(".bar").style.display = working ? "" : "none";
+        $(".fill").classList.toggle("indeterminate", percent == null);
+        $(".fill").style.width = percent == null ? "" : `${percent}%`;
+        $(".cancel").title = working ? "Cancel download" : "Close";
+        $(".cancel").onclick = working ? () => chrome.runtime.sendMessage({ type: "cancelJob" }) : close;
+        if (frontend && !$(".fallback")) {
+          const open = document.createElement("button");
+          open.className = "primary fallback";
+          open.textContent = `Open on ${new URL(frontend).host}`;
+          open.onclick = () => {
+            chrome.runtime.sendMessage({ type: "openFrontend", link, frontend });
+            close();
+          };
+          $(".row").after(open);
+        }
+        if (!working) hideTimer = setTimeout(close, { done: 3000, cancelled: 2000 }[state] ?? 10000);
+      },
+    };
+  }
+
   chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === "job" && window === window.top) showJob(msg);
     if (msg.type === "prompt" && window === window.top) show(msg.link, msg.kind);
     if (msg.type === "progress") onProgress?.(msg.text);
   });

@@ -105,15 +105,24 @@ const notify = (title, message) =>
 const YTDLP_HOST = "com.cobalt_downloader.ytdlp";
 const isYouTube = (link) => /^((www|m|music)\.)?youtube\.com$|^youtu\.be$/.test(new URL(link).hostname);
 
-async function download(link, mode, kind, onProgress) {
+const CANCELLED = { ok: false, cancelled: true };
+
+// Says which part yt-dlp is on: video and audio download one after the other.
+function progressText({ percent, stage }, mode) {
+  if (percent >= 100) return "Finishing…";
+  const part = mode === "audio" ? "" : stage ? " audio" : " video";
+  return `Downloading${part} · ${Math.floor(percent)}%`;
+}
+
+async function download(link, mode, kind, onProgress, signal) {
   const { torboxKey, useYtdlp, quality } = await getSettings();
-  if (kind === "torbox") return torboxDownload(torboxKey, link);
+  if (kind === "torbox") return torboxDownload(torboxKey, link, signal);
   // Public cobalt instances fail on YouTube too often, so when the local yt-dlp helper is
   // installed (see native/) YouTube goes only there. The cobalt website stays on offer.
   const ytdlp = useYtdlp && isYouTube(link);
   if (ytdlp) {
-    const viaYtdlp = await ytdlpDownload(link, mode, quality, onProgress);
-    if (viaYtdlp.ok) return viaYtdlp;
+    const viaYtdlp = await ytdlpDownload(link, mode, quality, onProgress, signal);
+    if (viaYtdlp.ok || viaYtdlp.cancelled) return viaYtdlp;
     if (!viaYtdlp.missing) {
       return {
         ok: false,
@@ -123,7 +132,8 @@ async function download(link, mode, kind, onProgress) {
       };
     }
   }
-  const result = await cobaltDownload(link, mode);
+  const result = await cobaltDownload(link, mode, signal);
+  if (result.cancelled) return result;
   if (!result.ok && ytdlp) {
     result.message = "cobalt couldn't download this. Set up the yt-dlp helper for reliable YouTube downloads.";
   }
@@ -131,13 +141,15 @@ async function download(link, mode, kind, onProgress) {
   // YouTube it returns low-resolution AV1 WebM files, so the cobalt website (H.264 MP4)
   // is the better fallback there.
   if (result.ok || !torboxKey || mode === "audio" || isYouTube(link)) return result;
-  const viaTorbox = await torboxDownload(torboxKey, link);
+  const viaTorbox = await torboxDownload(torboxKey, link, signal);
+  if (viaTorbox.cancelled) return viaTorbox;
   return viaTorbox.ok ? viaTorbox : { ...result, errors: [...result.errors, `TorBox: ${viaTorbox.error}`] };
 }
 
 // Runs the download through the native yt-dlp helper and resolves when it finishes,
-// reporting progress (e.g. "42.0%") along the way.
-function ytdlpDownload(link, mode, quality, onProgress) {
+// reporting progress ({ percent, stage }) along the way. Aborting the signal asks the
+// helper to stop yt-dlp and delete the partial files.
+function ytdlpDownload(link, mode, quality, onProgress, signal) {
   return new Promise((resolve) => {
     const port = chrome.runtime.connectNative(YTDLP_HOST);
     let settled = false;
@@ -149,10 +161,11 @@ function ytdlpDownload(link, mode, quality, onProgress) {
     };
     port.onMessage.addListener((msg) => {
       if (msg.type === "progress") {
-        onProgress?.(msg.percent);
+        onProgress?.(progressText(msg, mode), msg.percent);
       } else if (msg.type === "done") {
-        notify("Saved to Downloads", msg.file.split("/").pop());
-        finish({ ok: true, host: "yt-dlp", saved: true });
+        finish({ ok: true, host: "yt-dlp", saved: true, file: msg.file });
+      } else if (msg.type === "cancelled") {
+        finish(CANCELLED);
       } else if (msg.type === "error") {
         finish({ ok: false, error: msg.error });
       }
@@ -160,6 +173,10 @@ function ytdlpDownload(link, mode, quality, onProgress) {
     port.onDisconnect.addListener(() => {
       const error = chrome.runtime.lastError?.message ?? "the helper stopped";
       finish({ ok: false, error, missing: /not found|forbidden/i.test(error) });
+    });
+    signal?.addEventListener("abort", () => {
+      port.postMessage({ type: "cancel" });
+      setTimeout(() => finish(CANCELLED), 3000); // in case the helper doesn't answer
     });
     port.postMessage({ type: "download", url: link, mode, quality });
   });
@@ -172,13 +189,15 @@ function ytdlpStatus() {
     .catch(() => "no-helper");
 }
 
-async function torboxDownload(key, link) {
+async function torboxDownload(key, link, signal) {
   try {
     const job = await torbox.add(key, link);
     const ready = await torbox.check(key, job);
+    if (signal?.aborted) return CANCELLED;
     if (ready) {
-      for (const file of ready.files) await save(file.url, file.filename);
-      return { ok: true, host: "TorBox" };
+      const downloadIds = [];
+      for (const file of ready.files) downloadIds.push(await save(file.url, file.filename));
+      return { ok: true, host: "TorBox", downloadIds };
     }
     const { torboxJobs = [] } = await chrome.storage.local.get("torboxJobs");
     await chrome.storage.local.set({ torboxJobs: [...torboxJobs, { ...job, link, addedAt: Date.now() }] });
@@ -235,7 +254,7 @@ async function tunnelHasData(url) {
   }
 }
 
-async function cobaltDownload(link, mode) {
+async function cobaltDownload(link, mode, signal) {
   const settings = await getSettings();
   const list = await getInstances();
   let apis = list.filter((i) => !i.turnstile).map((i) => i.api);
@@ -247,6 +266,7 @@ async function cobaltDownload(link, mode) {
 
   const errors = [];
   for (const api of apis) {
+    if (signal?.aborted) return CANCELLED;
     const host = new URL(api).host;
     try {
       const res = await fetch(api, {
@@ -261,13 +281,15 @@ async function cobaltDownload(link, mode) {
           errors.push(`${host}: empty file`);
           continue;
         }
-        await save(data.url, data.filename);
-        return { ok: true, host };
+        if (signal?.aborted) return CANCELLED;
+        return { ok: true, host, downloadIds: [await save(data.url, data.filename)] };
       }
       if (data.status === "picker") {
-        if (mode === "audio" && data.audio) await save(data.audio, data.audioFilename);
-        else for (const item of data.picker) await save(item.url);
-        return { ok: true, host };
+        if (signal?.aborted) return CANCELLED;
+        const downloadIds = [];
+        if (mode === "audio" && data.audio) downloadIds.push(await save(data.audio, data.audioFilename));
+        else for (const item of data.picker) downloadIds.push(await save(item.url));
+        return { ok: true, host, downloadIds };
       }
       errors.push(`${host}: ${data.error?.code ?? data.status}`);
     } catch (e) {
@@ -319,8 +341,8 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
     });
   } else if (msg.type === "download") {
     const tabId = sender.tab?.id;
-    const onProgress = (percent) =>
-      chrome.tabs.sendMessage(tabId, { type: "progress", link: msg.link, text: `yt-dlp ${percent}` }).catch(() => {});
+    const onProgress = (text) =>
+      chrome.tabs.sendMessage(tabId, { type: "progress", link: msg.link, text }).catch(() => {});
     download(msg.link, msg.mode, msg.kind, tabId && onProgress).then(respond);
     return true;
   } else if (msg.type === "openFrontend") {
@@ -328,48 +350,93 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
   } else if (msg.type === "instances") {
     getInstances(msg.force).then(respond);
     return true;
+  } else if (msg.type === "cancelJob") {
+    jobs.get(sender.tab?.id)?.abort();
   } else if (msg.type === "ytdlpStatus") {
     ytdlpStatus().then(respond);
     return true;
   }
 });
 
-// The toolbar button downloads the current page right away; progress and the result
-// show on the button's badge, failures also as a notification.
+// The toolbar button downloads the current page right away and shows a compact status
+// toast in the tab. Clicking it again (or the toast's ×) cancels the download.
+const jobs = new Map(); // tabId -> AbortController
+
 chrome.action.onClicked.addListener(async (tab) => {
+  const running = jobs.get(tab.id);
+  if (running) return running.abort();
   if (!/^https?:|^magnet:/.test(tab.url ?? "")) return;
-  const badge = (text, color) => {
-    chrome.action.setBadgeText({ tabId: tab.id, text });
-    if (color) chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color });
+
+  const controller = new AbortController();
+  jobs.set(tab.id, controller);
+  const link = tab.url;
+  const show = (state, text, extra = {}) => {
+    chrome.action.setBadgeText({ tabId: tab.id, text: state === "working" ? "…" : "" });
+    return report(tab.id, { type: "job", link, state, text, ...extra });
   };
-  badge("…", "#636366");
-  const found = await classify(tab.url);
-  const result = await download(tab.url, "auto", found?.kind ?? "video", (percent) =>
-    badge(String(Math.floor(parseFloat(percent)) || 0)),
-  );
-  if (result.ok) {
-    badge("✓", "#34c759");
-    if (result.queued) notify("Added to TorBox", "It will download automatically when ready.");
-    setTimeout(() => badge(""), 5000);
-    return;
+  try {
+    await show("working", "Starting…");
+    const found = await classify(link);
+    const result = await download(
+      link, "auto", found?.kind ?? "video",
+      (text, percent) => show("working", text, { percent }),
+      controller.signal,
+    );
+    if (result.cancelled) return show("cancelled", "Download cancelled");
+    if (result.queued) return show("done", "Added to TorBox. It will download when ready.");
+    if (!result.ok) {
+      const text = result.message ?? result.error ?? "No working instance could download this link.";
+      if (!(await show("error", text, { frontend: result.frontend }))) notify("Couldn't download this", text);
+      return;
+    }
+    const outcome = result.downloadIds
+      ? await followDownloads(result.downloadIds, controller.signal, (text, percent) => show("working", text, { percent }))
+      : "done";
+    if (outcome === "cancelled") return show("cancelled", "Download cancelled");
+    if (outcome !== "done") return show("error", `Download failed: ${outcome}`);
+    if (!(await show("done", "Saved to Downloads"))) notify("Saved to Downloads", result.file?.split("/").pop() ?? link);
+  } finally {
+    jobs.delete(tab.id);
   }
-  badge("!", "#ff3b30");
-  const message = result.message ?? result.error ?? "No working instance could download this link.";
-  if (!result.frontend) return notify("Couldn't download this", message);
-  chrome.notifications.create(`open|${result.frontend}|${tab.url}`, {
-    type: "basic",
-    iconUrl: "icons/128.png",
-    title: "Couldn't download this",
-    message: `${message} Click to open it on ${new URL(result.frontend).host}.`,
-  });
 });
 
-chrome.notifications.onClicked.addListener((id) => {
-  if (!id.startsWith("open|")) return;
-  chrome.notifications.clear(id);
-  const [, frontend, link] = id.match(/^open\|([^|]+)\|(.*)$/s);
-  openFrontend(link, frontend);
-});
+const formatBytes = (n) => (n > 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`);
+
+// Follows browser downloads to the end, reporting progress. Returns "done",
+// "cancelled" or the browser's error.
+async function followDownloads(ids, signal, onProgress) {
+  while (true) {
+    const items = (await Promise.all(ids.map((id) => chrome.downloads.search({ id })))).flat();
+    if (signal.aborted) {
+      await Promise.all(items.filter((d) => d.state === "in_progress").map((d) => chrome.downloads.cancel(d.id)));
+      return "cancelled";
+    }
+    const failed = items.find((d) => d.state === "interrupted");
+    if (failed) return failed.error ?? "interrupted";
+    if (items.every((d) => d.state === "complete")) return "done";
+    const received = items.reduce((sum, d) => sum + d.bytesReceived, 0);
+    const total = items.every((d) => d.totalBytes > 0) ? items.reduce((sum, d) => sum + d.totalBytes, 0) : 0;
+    const percent = total ? Math.floor((received / total) * 100) : undefined;
+    onProgress(total ? `Downloading · ${percent}%` : `Downloading · ${formatBytes(received)}`, percent);
+    await new Promise((r) => setTimeout(r, 700));
+  }
+}
+
+// Sends a status update to the tab's toast, injecting the content script into tabs
+// opened before install. Returns false where no toast can be shown (e.g. new tab page).
+async function report(tabId, msg) {
+  try {
+    await chrome.tabs.sendMessage(tabId, msg);
+    return true;
+  } catch {}
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+    await chrome.tabs.sendMessage(tabId, msg);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // The offscreen document polls the clipboard; it only exists while watching is on.
 async function syncOffscreen() {
