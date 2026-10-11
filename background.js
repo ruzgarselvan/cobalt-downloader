@@ -163,7 +163,7 @@ function ytdlpDownload(link, mode, quality, onProgress, signal) {
       if (msg.type === "progress") {
         onProgress?.(progressText(msg, mode), msg.percent);
       } else if (msg.type === "done") {
-        finish({ ok: true, host: "yt-dlp", saved: true, file: msg.file });
+        finish({ ok: true, host: "yt-dlp", saved: true, existing: msg.existing, file: msg.file });
       } else if (msg.type === "cancelled") {
         finish(CANCELLED);
       } else if (msg.type === "error") {
@@ -394,7 +394,8 @@ chrome.action.onClicked.addListener(async (tab) => {
       : "done";
     if (outcome === "cancelled") return show("cancelled", "Download cancelled");
     if (outcome !== "done") return show("error", `Download failed: ${outcome}`);
-    if (!(await show("done", "Saved to Downloads"))) notify("Saved to Downloads", result.file?.split("/").pop() ?? link);
+    const done = result.existing ? "Already in your Downloads folder" : "Saved to Downloads";
+    if (!(await show("done", done))) notify(done, result.file?.split("/").pop() ?? link);
   } finally {
     jobs.delete(tab.id);
   }

@@ -160,7 +160,9 @@ if (!window.__cobaltIndir) {
           btn.innerHTML = ICONS.done;
           status.textContent = result.queued
             ? "Added to TorBox. It will download automatically when ready."
-            : result.saved ? "Saved to Downloads" : `Downloading via ${result.host}`;
+            : result.existing
+              ? "Already in your Downloads folder"
+              : result.saved ? "Saved to Downloads" : `Downloading via ${result.host}`;
           deadline = Date.now() + (result.queued ? 5000 : 2000);
           return;
         }

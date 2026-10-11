@@ -90,23 +90,26 @@ def download(request):
     threading.Thread(target=watch_for_cancel, daemon=True).start()
     signal.signal(signal.SIGTERM, cancel)
 
-    returncode, path, destination, stderr = run(args)
+    returncode, path, destination, stderr, downloaded = run(args)
     if returncode != 0 and "HTTP Error 403" in stderr and not cancelled.is_set():
         # YouTube sometimes refuses a stream URL once; a fresh attempt usually works.
-        returncode, path, destination, stderr = run(args)
+        returncode, path, destination, stderr, downloaded = run(args)
 
     if cancelled.is_set():
         remove_partial_files(destination)
         send({"type": "cancelled"})
     elif returncode == 0:
-        send({"type": "done", "file": path})
+        # No progress at all means yt-dlp found the file already downloaded.
+        send({"type": "done", "file": path, "existing": not downloaded})
     else:
         lines = [l for l in stderr.splitlines() if "ERROR" in l]
         send({"type": "error", "error": (lines[-1] if lines else stderr.strip()[-300:]) or "yt-dlp failed"})
 
 
 def run(args):
-    """Runs yt-dlp, forwarding progress; returns (returncode, final path, planned path, stderr).
+    """Runs yt-dlp, forwarding progress.
+
+    Returns (returncode, final path, planned path, stderr, whether anything was downloaded).
 
     Video and audio are downloaded one after the other, so the percentage starts over;
     each restart bumps "stage" so the extension can say which part is downloading.
@@ -135,7 +138,7 @@ def run(args):
                 path = line[len("FILE "):]
         process.wait()
         errors.seek(0)
-        return process.returncode, path, destination, errors.read()
+        return process.returncode, path, destination, errors.read(), last >= 0
 
 
 message = read()
@@ -143,3 +146,6 @@ if message and message.get("type") == "ping":
     send({"type": "pong", "ytdlp": bool(shutil.which("yt-dlp"))})
 elif message and message.get("type") == "download":
     download(message)
+# Exit right away: a normal interpreter shutdown aborts (SIGABRT) while the cancel
+# watcher thread is still blocked reading stdin.
+os._exit(0)
